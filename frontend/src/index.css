@@ -1,0 +1,130 @@
+:root {
+  --bg: #f1f2f4;
+  --panel: #ffffff;
+  --text: #172b4d;
+  --muted: #626f86;
+  --line: #dcdfe4;
+  --primary: #0c66e4;
+  --primary-hover: #0055cc;
+  --danger: #c9372c;
+  --column: #ebecf0;
+  --radius: 8px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* font e colore si ereditano: valgono per tutta la pagina */
+  color: var(--text);
+}
+* { box-sizing: border-box; }                 /* width comprende padding e bordo (altrimenti width:100% + padding esce dal contenitore) */
+body { margin: 0; background: var(--bg); }    /* toglie il margine di default del browser */
+h1 { font-size: 1.5rem; margin: 0 0 16px; }   /* rem = rispetto al font della radice (16px) -> 24px */
+h2 { font-size: 0.95rem; margin: 0 0 10px; }
+h3 { font-size: 1rem; margin: 0 0 8px; }
+a { color: var(--primary); text-decoration: none; }
+
+/* ---------- controlli ---------- */
+input, textarea, select {
+  font: inherit; width: 100%; padding: 8px 10px; margin-top: 4px;   /* i controlli non ereditano il font: inherit */
+  border: 1px solid var(--line); border-radius: 6px; background: #fff;
+}
+textarea { resize: vertical; }
+/* l'input sta DENTRO la label: clic sul testo = focus sul campo; block = una per riga */
+label { display: block; margin-bottom: 12px; font-size: 0.9rem; color: var(--muted); }
+button {
+  font: inherit; cursor: pointer; padding: 8px 14px; border-radius: 6px;
+  border: 1px solid var(--line); background: #fff; color: var(--text);
+}
+/* varianti con una classe: button.primary (0,1,1) batte button (0,0,1) */
+button:disabled { opacity: .5; cursor: not-allowed; }   /* pseudo-classe: attiva con l'attributo disabled */
+button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+button.primary:hover { background: var(--primary-hover); }
+button.danger { background: #fff; border-color: var(--danger); color: var(--danger); }
+button.ghost { background: transparent; border-color: transparent; }
+button.small { padding: 2px 8px; font-size: 0.8rem; }
+.error { color: var(--danger); font-size: 0.9rem; }
+.muted { color: var(--muted); }
+.spacer { flex: 1; }                          /* in un contenitore flex prende tutto lo spazio libero -> spinge a destra ciò che segue */
+.badge {
+  display: inline-block; font-size: 0.7rem; padding: 1px 8px; border-radius: 99px;   /* 99px = forma a pillola */
+  background: #e9f2ff; color: var(--primary); vertical-align: middle;
+}
+.panel { background: var(--panel); border-radius: var(--radius); padding: 16px; box-shadow: 0 1px 2px rgba(9, 30, 66, .15); }
+.inline-form { display: flex; gap: 8px; margin-bottom: 16px; max-width: 520px; }   /* input e bottone sulla stessa riga */
+.inline-form input { margin-top: 0; }         /* (0,1,1) batte input (0,0,1) */
+
+/* ---------- layout ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+  background: var(--primary); color: #fff;
+}
+.topbar .brand { color: #fff; font-weight: 700; }
+.topbar button { color: #fff; }               /* selettore discendente: solo i bottoni dentro la topbar */
+.page { padding: 20px; }
+
+/* ---------- login / registrazione ---------- */
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 16px; }   /* centra il form in verticale e orizzontale */
+.auth-form { width: 100%; max-width: 360px; }
+.auth-form button { width: 100%; margin-top: 4px; }
+
+/* ---------- lista board ---------- */
+/* griglia responsive senza media query: tante colonne quante ne entrano, ognuna almeno 220px */
+.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.board-tile {                                   /* è un <a> (Link): block per avere padding e altezza */
+  display: block; background: var(--panel); border-radius: var(--radius); padding: 14px;
+  min-height: 90px; color: var(--text); box-shadow: 0 1px 2px rgba(9, 30, 66, .15);
+}
+.board-tile:hover { box-shadow: 0 4px 10px rgba(9, 30, 66, .2); }
+
+/* ---------- board ---------- */
+.board-header h1 { margin-top: 6px; }
+/* 4 colonne di almeno 220px; finestra stretta -> scorrimento orizzontale. start = ognuna alta quanto il suo contenuto */
+.columns {
+  display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px;
+  align-items: start; overflow-x: auto; padding-bottom: 8px;
+}
+.column {
+  background: var(--column); border-radius: var(--radius); padding: 10px;
+  min-height: 200px; transition: background .15s;
+}
+.column.over { background: #cce0ff; }          /* due classi sullo stesso elemento. Evidenziazione durante il drag: NON ancora applicata (esercizio) */
+.count { color: var(--muted); font-weight: 400; }
+
+/* anteprima card: altezza fissa; flex in colonna -> titolo in alto, dettagli in basso */
+.card-item {
+  background: #fff; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; height: 76px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 0 1px 1px rgba(9, 30, 66, .25); cursor: grab;
+}
+.card-item:hover { outline: 2px solid var(--primary); }   /* outline e non border: non occupa spazio -> niente "salti" */
+.card-title {
+  margin: 0; font-size: 0.9rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;   /* max 2 righe */
+}
+.card-meta { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--muted); }
+.card-meta .avatar { margin-left: auto; }     /* in flex, margin-left:auto spinge l'avatar tutto a destra */
+.avatar {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;   /* 50% = cerchio */
+  background: var(--primary); color: #fff; font-size: 0.7rem; font-weight: 700;
+}
+
+/* membri */
+.members { margin-top: 16px; max-width: 420px; }
+.members ul { list-style: none; padding: 0; margin: 0 0 12px; }   /* lista senza pallini né rientro */
+.members li { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+
+/* ---------- modale ---------- */
+.card-dialog {
+  border: none; border-radius: var(--radius); padding: 20px;
+  width: min(560px, 92vw); box-shadow: 0 8px 30px rgba(9, 30, 66, .3);   /* 560px, ma mai oltre il 92% della finestra */
+}
+.card-dialog::backdrop { background: rgba(9, 30, 66, .5); }   /* pseudo-elemento: lo sfondo scuro che esiste SOLO con showModal() */
+.dialog-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.dialog-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ---------- sottotask ---------- */
+.subtasks { margin-bottom: 12px; }
+.subtasks h4 { font-size: 0.9rem; margin: 0 0 6px; }
+.subtasks ul { list-style: none; padding: 0; margin: 0 0 8px; }
+.subtasks li { display: flex; align-items: center; justify-content: space-between; }
+.subtasks .inline-form { margin-bottom: 0; }
+/* label.check (0,1,1) batte label (0,0,1): checkbox e testo in riga, colore normale */
+label.check { display: inline-flex; align-items: center; gap: 8px; margin: 2px 0; color: var(--text); font-size: 0.9rem; }
+label.check input { width: auto; margin: 0; } /* annulla width:100% di input, altrimenti la checkbox è larga quanto la riga */
+.done { text-decoration: line-through; color: var(--muted); }   /* sottotask fatto: barrato */

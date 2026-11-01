@@ -1,0 +1,11 @@
+services:
+  mongo:
+    image: mongo:8
+    container_name: taskmanager-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - taskmanager-mongo-data:/data/db
+
+volumes:
+  taskmanager-mongo-data:

@@ -1,0 +1,21 @@
+{
+  "name": "taskmanager-backend",
+  "version": "1.0.0",
+  "description": "Progetto Fondamenti del Web, API REST (Express + MongoDB) per un task manager aziendale (board Kanban)",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
