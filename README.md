@@ -4,8 +4,8 @@ Progetto d'esame di **Fondamenti del Web** (Politecnico di Bari, a.a. 2025/26).
 
 Applicazione web full-stack per organizzare il lavoro di un team in **board** con quattro colonne (*Backlog, Da fare, In corso, Fatto*). Le card si spostano con il drag and drop, si assegnano ai membri, hanno scadenza e una checklist di sottotask, e si aggiornano **in tempo reale** su tutti i browser aperti sulla stessa board.
 
-- **Applicazione online:** DA_COMPLETARE_URL_RENDER (le credenziali di test sono nella sezione 3)
-- **Documentazione interattiva delle API (Swagger UI):** `/api/docs` sullo stesso indirizzo
+- **Applicazione online:** https://taskmanager-t1kg.onrender.com (credenziali di test nella sezione 3; al primo accesso il servizio gratuito può impiegare circa un minuto a ripartire)
+- **Documentazione interattiva delle API (Swagger UI):** https://taskmanager-t1kg.onrender.com/api/docs
 - **Codice:** https://github.com/PaoloUrbano/taskmanager
 
 ---
