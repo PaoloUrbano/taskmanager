@@ -4,8 +4,9 @@ function subscribe(boardId, req, res) {
   const key = String(boardId);
   res.set({
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
+    "Cache-Control": "no-cache, no-transform",   // no-transform: i proxy non devono comprimere né trattenere lo stream
     Connection: "keep-alive",
+    "X-Accel-Buffering": "no",                   // disattiva il buffering dei proxy (es. Nginx) davanti al server
   });
   res.flushHeaders();                         // manda subito gli header senza chiudere la risposta
   res.write(": connesso\n\n");                // commento ignorato dal browser
