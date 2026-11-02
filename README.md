@@ -1,33 +1,63 @@
 # Task Manager aziendale
 
-Progetto d'esame di **Fondamenti del Web** (Politecnico di Bari, a.a. 2026/27).
+Progetto d'esame di **Fondamenti del Web** (Politecnico di Bari, a.a. 2025/26).
 
 Applicazione web full-stack per organizzare il lavoro di un team in **board** con quattro colonne (*Backlog, Da fare, In corso, Fatto*). Le card si spostano con il drag and drop, si assegnano ai membri, hanno scadenza e una checklist di sottotask, e si aggiornano **in tempo reale** su tutti i browser aperti sulla stessa board.
 
+- **Applicazione online:** DA_COMPLETARE_URL_RENDER (le credenziali di test sono nella sezione 3)
+- **Documentazione interattiva delle API (Swagger UI):** `/api/docs` sullo stesso indirizzo
+- **Codice:** https://github.com/PaoloUrbano/taskmanager
+
 ---
 
-## 1. Avvio rapido
+## 1. Scenario applicativo
 
-**Requisiti:** Node.js 20+, Docker (solo per MongoDB).
+Un'azienda vuole organizzare il lavoro dei suoi team con board Kanban condivise. Ogni dipendente si registra con la propria **email aziendale** (gli altri domini sono rifiutati). Chi avvia un progetto crea una **board**, ne diventa **owner** e invita i colleghi come **member**. L'owner crea le attività (**card**), le assegna e ne fissa le scadenze; tutti i membri le fanno avanzare tra le colonne *Backlog, Da fare, In corso, Fatto*, se le assegnano e spuntano i sottotask.
+
+Due esigenze guidano le scelte tecniche:
+- **lavoro contemporaneo**: chi guarda la stessa board vede subito le modifiche degli altri, senza ricaricare la pagina;
+- **nessuna modifica persa**: se due persone correggono insieme lo stesso testo, la seconda viene avvisata invece di cancellare senza saperlo il lavoro della prima.
+
+I ruoli **non sono globali**: la stessa persona può essere owner di una board e member di un'altra.
+
+---
+
+## 2. Casi d'uso
+
+![Diagramma UML dei casi d'uso](docs/casi-uso.png)
+
+| Attore | Cosa può fare |
+|---|---|
+| Visitatore | registrarsi (solo con email del dominio aziendale) e accedere |
+| Utente autenticato | vedere le board di cui fa parte, crearne di nuove (ne diventa owner), uscire |
+| Member (di una board) | aprire la board e riceverne gli aggiornamenti in tempo reale, spostare le card, modificarne titolo e descrizione, assegnarsi una card, gestire i sottotask |
+| Owner (di una board) | tutto ciò che fa il member, più: creare ed eliminare card, impostare le scadenze, assegnare le card a qualsiasi membro, aggiungere e rimuovere membri |
+
+Member e owner sono specializzazioni dell'utente autenticato e valgono **per una singola board**. Rinomina ed eliminazione della board sono disponibili solo come API (sezione 7). Il sorgente dei diagrammi (PlantUML) è in `docs/`.
+
+---
+
+## 3. Avvio rapido
+
+**Requisiti:** Node.js 20+ e un database **MongoDB in cloud** (MongoDB Atlas, piano gratuito M0).
 
 ```bash
-# 1. Database (dalla cartella principale del repository)
-docker compose up -d                 # MongoDB 8 sulla porta 27017
-
-# 2. Backend  ->  http://localhost:3000/api
+# 1. Backend  ->  http://localhost:3000/api
 cd backend
-cp .env.example .env                 # su Windows: copy .env.example .env
+cp .env.example .env                 # su Windows: copy .env.example .env, poi inserire la stringa di Atlas in MONGO_URI
 npm install
-npm run seed                         # dati di prova
+npm run seed                         # dati di prova (cancella e ricrea il database)
 npm run dev
 
-# 3. Frontend  ->  http://localhost:5173
+# 2. Frontend  ->  http://localhost:5173
 cd ../frontend
 npm install
 npm run dev
 ```
 
-**Utenti di prova** (password per tutti: `password123`):
+In alternativa ad Atlas, per lavorare senza rete, `docker compose up -d` avvia MongoDB in locale: in quel caso `MONGO_URI=mongodb://localhost:27017/taskmanager`.
+
+**Credenziali di test** (valgono anche per l'applicazione online; password per tutti: `password123`):
 
 | Utente | Ruolo |
 |---|---|
@@ -43,15 +73,15 @@ Il file `.env` non è nel repository perché contiene il segreto dei token: si c
 
 | Variabile | Significato |
 |---|---|
-| `PORT` | porta del backend (3000) |
-| `MONGO_URI` | `mongodb://localhost:27017/taskmanager` |
+| `PORT` | porta del backend (3000 in locale; su Render la imposta la piattaforma) |
+| `MONGO_URI` | stringa di connessione di MongoDB Atlas, con il nome del database: `mongodb+srv://<utente>:<password>@<cluster>.mongodb.net/taskmanager` |
 | `JWT_SECRET` | segreto per firmare i token |
 | `JWT_EXPIRES_IN` | durata del token (es. `8h`) |
 | `ALLOWED_EMAIL_DOMAIN` | dominio ammesso in registrazione (vuoto = chiunque) |
 
 ---
 
-## 2. Manuale d'uso
+## 4. Manuale d'uso
 
 - **Registrazione e accesso.** Ci si registra con l'email del dominio aziendale. Non esistono ruoli globali.
 - **Ruoli per board.** Chi crea una board ne diventa **owner** e può aggiungere altri utenti come **member** tramite la loro email. La stessa persona può essere owner di una board e member di un'altra.
@@ -72,26 +102,29 @@ Il file `.env` non è nel repository perché contiene il segreto dei token: si c
 
 ---
 
-## 3. Architettura
+## 5. Architettura
 
 L'applicazione ha tre livelli (architettura **three-tier**):
 
 1. **Client: una SPA React** che gira nel browser. Le pagine (`pages`) sono composte da componenti (`components`); i dati della board arrivano dall'hook `useBoard`, l'utente loggato da `AuthContext`. Tutte le chiamate al server passano da `api/client.js`, che aggiunge il token JWT e gestisce gli errori.
 2. **Server: un'API REST con Express**, senza stato di sessione (l'utente è identificato dal JWT a ogni richiesta). Ogni richiesta passa dai router, dai middleware di autenticazione e permessi e poi dai controller, che leggono e scrivono il database con Mongoose.
-3. **Database: MongoDB**, con tre collezioni: `users`, `boards`, `cards`.
+3. **Database: MongoDB in cloud** (MongoDB Atlas), con tre collezioni: `users`, `boards`, `cards`.
 
 Il client parla con il server in due modi:
 - **richieste HTTP** su `/api/*`, con body e risposte in JSON;
 - **uno stream SSE** per board (`/api/boards/:id/events`): il server avvisa i browser aperti su quella board quando qualcosa cambia, e loro ricaricano i dati.
 
-In sviluppo Vite inoltra le richieste `/api` al backend sulla porta 3000: per il browser è tutto sulla stessa origine, quindi non serve configurare CORS.
+In sviluppo Vite inoltra le richieste `/api` al backend sulla porta 3000; in produzione è Express stesso a servire anche il frontend compilato. In entrambi i casi per il browser è tutto sulla stessa origine, quindi non serve configurare CORS.
 
 ### Struttura delle cartelle
 
 | Percorso | Contenuto |
 |---|---|
-| `docker-compose.yml` | solo MongoDB |
-| `backend/app.js` | punto di ingresso: middleware globali, router, 404, gestione degli errori |
+| `package.json` | script di build e avvio per il deployment (installa backend e frontend, compila il frontend, avvia il backend) |
+| `docs/` | diagrammi UML (casi d'uso, sequenza) e loro sorgenti PlantUML |
+| `docker-compose.yml` | MongoDB in locale (facoltativo, alternativa ad Atlas) |
+| `backend/app.js` | punto di ingresso: middleware globali, router, documentazione Swagger, frontend compilato (in produzione), 404, gestione degli errori |
+| `backend/docs/` | specifica OpenAPI (`openapi.json`) e pagina Swagger UI |
 | `backend/models/` | User, Board, Card (con i sottotask) |
 | `backend/routes/` | auth; boards (con membri, card della board e stream SSE); cards (con i sottotask) |
 | `backend/middleware/` | requireAuth (JWT); boardAccess (loadCard, loadBoard, requireMember, requireOwner); errorHandler |
@@ -109,9 +142,20 @@ In sviluppo Vite inoltra le richieste `/api` al backend sulla porta 3000: per il
 ### Percorso di una richiesta (es. spostare una card)
 `CardItem` (dragstart) -> `Column` (drop) -> `BoardPage.handleMove` -> `api.patch('/cards/:id/status')` -> proxy Vite -> Express -> `requireAuth` -> `loadCard` -> `loadBoard` -> `requireMember` -> `updateStatus` -> MongoDB -> `publish()` sullo stream della board -> risposta JSON -> `reload()` -> React ridisegna. Sugli altri browser l'evento SSE provoca lo stesso `reload()`.
 
+![Diagramma di sequenza: spostamento di una card con aggiornamento in tempo reale](docs/sequenza-spostamento.png)
+
+### Deployment
+
+L'applicazione è pubblicata su **Render** come un unico servizio web, collegato al repository GitHub:
+- **build:** `npm run build` (dalla cartella principale: installa backend e frontend e compila il frontend in `frontend/dist`);
+- **avvio:** `npm start` (avvia il backend, che serve le API su `/api` e la SPA su tutti gli altri percorsi);
+- **variabili d'ambiente** impostate su Render: `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `ALLOWED_EMAIL_DOMAIN`;
+- il database è su **MongoDB Atlas**, raggiungibile dal server di Render (accesso di rete consentito da qualunque indirizzo, protetto da utente e password);
+- Render fornisce **HTTPS**: password e token viaggiano cifrati.
+
 ---
 
-## 4. Modello dati
+## 6. Modello dati
 
 ```
 User   { email (unique), password (hash bcrypt), name }
@@ -137,7 +181,9 @@ MongoDB non ha chiavi esterne: la garantisce l'applicazione.
 
 ---
 
-## 5. API REST
+## 7. API REST
+
+**Documentazione interattiva:** Swagger UI su `/api/docs` (in locale http://localhost:3000/api/docs); la specifica OpenAPI è in `backend/docs/openapi.json`. Per provare le rotte protette: login, copiare il token, pulsante *Authorize*.
 
 Prefisso `/api`, body JSON. Tutte le rotte tranne registrazione e login richiedono l'header `Authorization: Bearer <jwt>` (lo stream SSE riceve il token come `?token=`, perché EventSource non può mandare header).
 
@@ -212,7 +258,31 @@ router.patch("/:cardId", requireAuth, loadCard, loadBoard, requireMember, ctrl.u
 
 ---
 
-## 6. Scelte progettuali
+## 8. Componenti React
+
+I **dati scendono** come props (board, card), gli **eventi salgono** come callback (`onMove`, `onOpen`, `onChanged`). Le card vivono in un solo posto, l'hook `useBoard`: dopo ogni azione si ricarica e tutta la pagina si ridisegna in modo coerente.
+
+| Componente o modulo | Ruolo |
+|---|---|
+| `main.jsx` | monta l'applicazione: StrictMode, BrowserRouter (React Router), AuthProvider |
+| `App.jsx` | le rotte: `/login` e `/register` pubbliche; `/boards` e `/boards/:id` protette da `RequireAuth`, dentro `Layout` |
+| `context/AuthContext.jsx` | stato globale dell'autenticazione (token e utente, salvati anche in localStorage), funzioni `login` e `logout`, hook `useAuth()` |
+| `api/client.js` | unico punto che usa fetch: aggiunge il token, converte in JSON, trasforma le risposte di errore in eccezioni con lo status, logout automatico su 401 |
+| `hooks/useBoard.js` | custom hook: carica board e card in parallelo, apre l'EventSource della board e ricarica a ogni evento; chiude lo stream nel cleanup |
+| `components/RequireAuth.jsx` | protegge le rotte: senza token reindirizza a `/login` |
+| `components/Layout.jsx` | barra in alto con il nome dell'utente e "Esci"; la pagina corrente compare in `<Outlet />` |
+| `pages/LoginPage.jsx`, `pages/RegisterPage.jsx` | form controllati; dopo la registrazione il login è automatico |
+| `pages/BoardsPage.jsx` | le board dell'utente (con il suo ruolo) e la creazione di una nuova board |
+| `pages/BoardPage.jsx` | la board: creazione delle card (owner), le quattro colonne, il pannello dei membri, il dettaglio della card; gestisce lo spostamento |
+| `components/Column.jsx` | una colonna: zona di rilascio del drag and drop HTML5 |
+| `components/CardItem.jsx` | anteprima della card (titolo, scadenza, sottotask completati, assegnatario); trascinabile, al click apre il dettaglio |
+| `components/CardDialog.jsx` | dettaglio nel `<dialog>` modale nativo: titolo, descrizione, scadenza (owner) e assegnatario, salvati con controllo di versione (If-Match); eliminazione (owner) |
+| `components/SubtaskList.jsx` | checklist della card: aggiunta, spunta ed eliminazione immediate |
+| `components/MembersPanel.jsx` | le persone della board; l'owner aggiunge (per email) e rimuove i membri |
+
+---
+
+## 9. Scelte progettuali
 
 **Permessi come middleware componibili.** `loadBoard -> requireMember -> requireOwner`: ogni passo prepara ciò che serve al successivo (`req.board`, `req.isOwner`). I controller non ricontrollano i permessi.
 
@@ -231,7 +301,7 @@ router.patch("/:cardId", requireAuth, loadCard, loadBoard, requireMember, ctrl.u
 
 ---
 
-## 7. Sicurezza
+## 10. Sicurezza
 
 - Password salvate con **bcrypt** mai restituite nelle risposte.
 - **JWT** firmato con scadenza; messaggio d'errore unico nel login (nessuna enumerazione degli utenti).
@@ -239,10 +309,11 @@ router.patch("/:cardId", requireAuth, loadCard, loadBoard, requireMember, ctrl.u
 - Validazione nel **backend** (Mongoose, `runValidators`); quella nei form è solo comodità.
 - Descrizione in **testo semplice**: nessun XSS.
 - Chi non è membro riceve 404: non ottiene l'informazione dell'esistenza della board.
+- In produzione l'applicazione è servita in **HTTPS** (Render): password e token viaggiano cifrati.
 
 ---
 
-## 8. Limiti noti e sviluppi futuri
+## 11. Limiti noti e sviluppi futuri
 
 - **Token in localStorage**: leggibile da JavaScript in caso di XSS. Alternativa: cookie HttpOnly.
 - **Token SSE nella query string**: finisce nei log del server. Alternativa: cookie o ticket monouso a breve scadenza.
@@ -251,3 +322,4 @@ router.patch("/:cardId", requireAuth, loadCard, loadBoard, requireMember, ctrl.u
 - **Nessuna transazione**: l'eliminazione a cascata non è atomica. L'ordine scelto (prima le card, poi la board) evita comunque card orfane.
 - I JWT non sono revocabili prima della scadenza.
 - **API pronte ma non ancora collegate all'interfaccia**: rinomina (`PATCH /boards/:id`) ed eliminazione (`DELETE /boards/:id`) della board, provate con un client HTTP.
+- **Piano gratuito di Render**: dopo circa 15 minuti senza richieste il servizio si sospende e la prima richiesta successiva lo riavvia (attesa di circa un minuto).

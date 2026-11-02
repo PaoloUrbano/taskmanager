@@ -1,0 +1,67 @@
+@startuml casi-uso
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #EEF4FF
+  BorderColor #2563EB
+}
+skinparam rectangle {
+  BorderColor #64748B
+}
+title Task Manager aziendale: diagramma dei casi d'uso
+
+actor "Visitatore" as V
+actor "Utente\nautenticato" as U
+actor "Member\n(della board)" as M
+actor "Owner\n(della board)" as O
+
+M -up-|> U
+O -up-|> M
+
+rectangle "Task Manager aziendale" {
+  usecase "Registrarsi\n(email del dominio aziendale)" as UC1
+  usecase "Accedere (login)" as UC2
+
+  usecase "Vedere le proprie board" as UC3
+  usecase "Creare una board\n(ne diventa owner)" as UC4
+  usecase "Uscire (logout)" as UC5
+
+  usecase "Aprire una board" as UC6
+  usecase "Ricevere gli aggiornamenti\nin tempo reale" as UC7
+  usecase "Spostare una card\ntra le colonne" as UC8
+  usecase "Modificare titolo\ne descrizione di una card" as UC9
+  usecase "Gestire le modifiche\ncontemporanee (versione)" as UC10
+  usecase "Assegnarsi una card" as UC11
+  usecase "Gestire i sottotask\n(aggiungere, spuntare, eliminare)" as UC12
+
+  usecase "Creare una card" as UC13
+  usecase "Eliminare una card" as UC14
+  usecase "Impostare la scadenza" as UC15
+  usecase "Assegnare una card\na qualsiasi membro" as UC16
+  usecase "Gestire i membri\n(aggiungere, rimuovere)" as UC17
+}
+
+V --> UC1
+V --> UC2
+
+U --> UC3
+U --> UC4
+U --> UC5
+
+M --> UC6
+M --> UC8
+M --> UC9
+M --> UC11
+M --> UC12
+
+O --> UC13
+O --> UC14
+O --> UC15
+O --> UC16
+O --> UC17
+
+UC6 .> UC7 : <<include>>
+UC9 .> UC10 : <<include>>
+@enduml

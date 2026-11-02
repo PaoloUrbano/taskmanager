@@ -1,0 +1,33 @@
+@startuml sequenza-spostamento
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam sequenceMessageAlign left
+title Spostamento di una card con aggiornamento in tempo reale
+
+actor "Mario" as Mario
+participant "Browser di Mario\n(React)" as BM
+participant "Backend\n(Express)" as BE
+database "MongoDB\nAtlas" as DB
+participant "Browser di Paolo\n(React)" as BP
+actor "Paolo" as Paolo
+
+== Apertura della board (entrambi) ==
+BP -> BE : GET /api/boards/:id/events?token=JWT
+BE --> BP : 200 text/event-stream (connessione aperta)
+BM -> BE : GET /api/boards/:id/events?token=JWT
+BE --> BM : 200 text/event-stream (connessione aperta)
+
+== Spostamento ==
+Mario -> BM : trascina la card in "In corso"
+BM -> BE : PATCH /api/cards/:cardId/status\nAuthorization: Bearer JWT\n{ status: "doing" }
+BE -> BE : requireAuth, loadCard, loadBoard,\nrequireMember
+BE -> DB : findByIdAndUpdate($set status, position)
+DB --> BE : card aggiornata
+BE ->> BM : data: {"type":"card.updated"}
+BE ->> BP : data: {"type":"card.updated"}
+BE --> BM : 200 card (JSON)
+BM -> BE : GET board e card (reload)
+BP -> BE : GET board e card (reload)
+BE --> BP : board e card aggiornate
+BP -> Paolo : la card compare in "In corso"
+@enduml

@@ -1,14 +1,5 @@
-# Dipendenze: si reinstallano con npm install
 node_modules/
-
-# Segreti: su GitHub va solo backend/env.example
 .env
-
-# Build del frontend
 dist/
-
-# Impostazioni dell'IDE
 .idea/
-
-# Log
 *.log

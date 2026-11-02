@@ -1,0 +1,1793 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Task Manager aziendale, API REST",
+    "version": "1.0.0",
+    "description": "API del progetto di Fondamenti del Web (Politecnico di Bari). Per provare le rotte protette: eseguire POST /api/auth/login, copiare il token e premere Authorize.\n\nAccesso: login = utente autenticato; membro = owner o member della board; owner = solo il proprietario. A chi non è membro le rotte della board rispondono 404, per non rivelarne l'esistenza."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "stesso server che serve questa pagina"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Board"
+    },
+    {
+      "name": "Membri"
+    },
+    {
+      "name": "Card"
+    },
+    {
+      "name": "Sottotask"
+    },
+    {
+      "name": "Tempo reale"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Board non trovata"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "example": "paolo@azienda.it"
+          },
+          "name": {
+            "type": "string",
+            "example": "Paolo"
+          }
+        }
+      },
+      "UserRef": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
+      "Board": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Esame Fondamenti Web"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRef"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Subtask": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Scrivere il README"
+          },
+          "done": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Card": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "board": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Login con JWT"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "todo",
+              "doing",
+              "done"
+            ]
+          },
+          "position": {
+            "type": "number",
+            "description": "istante dell'ultimo spostamento: ordine dentro la colonna"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assignee": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ],
+            "nullable": true
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subtask"
+            }
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "__v": {
+            "type": "integer",
+            "description": "versione del contenuto (optimistic locking)"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registrazione",
+        "description": "Crea un utente. L'email deve appartenere al dominio ALLOWED_EMAIL_DOMAIN. La password viene salvata solo come hash bcrypt.",
+        "responses": {
+          "201": {
+            "description": "Utente creato (senza password)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dati non validi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dominio dell'email non ammesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email già registrata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password",
+                  "name"
+                ]
+              },
+              "example": {
+                "email": "giulia@azienda.it",
+                "password": "password123",
+                "name": "Giulia"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login",
+        "description": "Restituisce un JWT firmato (payload { sub, name }) da usare nell'header Authorization: Bearer <token>.",
+        "responses": {
+          "200": {
+            "description": "Login riuscito",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenziali non valide (messaggio unico)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              },
+              "example": {
+                "email": "paolo@azienda.it",
+                "password": "password123"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Utente corrente",
+        "description": "Non usata dall'interfaccia.",
+        "responses": {
+          "200": {
+            "description": "Utente corrente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/boards": {
+      "get": {
+        "tags": [
+          "Board"
+        ],
+        "summary": "Le mie board",
+        "description": "Board di cui l'utente è owner o member, popolate.",
+        "responses": {
+          "200": {
+            "description": "Elenco",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Board"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Board"
+        ],
+        "summary": "Crea una board",
+        "description": "Chi la crea ne diventa owner.",
+        "responses": {
+          "201": {
+            "description": "Board creata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Titolo mancante o troppo lungo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              },
+              "example": {
+                "title": "Nuovo progetto"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/boards/{id}": {
+      "get": {
+        "tags": [
+          "Board"
+        ],
+        "summary": "Dettaglio di una board",
+        "description": "Accesso: membro.",
+        "responses": {
+          "200": {
+            "description": "Board popolata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Board"
+        ],
+        "summary": "Rinomina la board",
+        "description": "Accesso: owner. Non usata dall'interfaccia. Evento SSE board.updated.",
+        "responses": {
+          "200": {
+            "description": "Board aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Titolo non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo il proprietario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Board"
+        ],
+        "summary": "Elimina la board",
+        "description": "Accesso: owner. Elimina anche tutte le card (cascade). Non usata dall'interfaccia. Evento SSE board.deleted.",
+        "responses": {
+          "204": {
+            "description": "Eliminata"
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo il proprietario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/boards/{id}/members": {
+      "post": {
+        "tags": [
+          "Membri"
+        ],
+        "summary": "Aggiunge un membro",
+        "description": "Accesso: owner. Per email; $addToSet evita i doppioni. Evento SSE board.updated.",
+        "responses": {
+          "200": {
+            "description": "Board aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "L'utente è già l'owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo il proprietario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Utente inesistente o board non accessibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              },
+              "example": {
+                "email": "luca@azienda.it"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/boards/{id}/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Membri"
+        ],
+        "summary": "Rimuove un membro",
+        "description": "Accesso: owner. $pull dai membri; le sue card tornano senza assegnatario (SET NULL). Evento SSE board.updated.",
+        "responses": {
+          "200": {
+            "description": "Board aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo il proprietario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id dell'utente da rimuovere"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/boards/{id}/cards": {
+      "get": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Card della board",
+        "description": "Accesso: membro. Ordinate per stato e posizione.",
+        "responses": {
+          "200": {
+            "description": "Elenco",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Card"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Crea una card",
+        "description": "Accesso: owner. Nasce in backlog se lo stato non è indicato. Evento SSE card.created.",
+        "responses": {
+          "201": {
+            "description": "Card creata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dati non validi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo il proprietario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "backlog",
+                      "todo",
+                      "doing",
+                      "done"
+                    ]
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              },
+              "example": {
+                "title": "Preparare la demo"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/boards/{id}/events": {
+      "get": {
+        "tags": [
+          "Tempo reale"
+        ],
+        "summary": "Stream degli aggiornamenti (SSE)",
+        "description": "Accesso: membro. Il token va nella query string perché EventSource non può mandare header. La risposta resta aperta: a ogni modifica della board arriva un messaggio `data: {\"type\":\"card.updated\",\"cardId\":\"...\"}`. Non si può provare da Swagger UI.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della board"
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "JWT"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream aperto",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cards/{cardId}": {
+      "get": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Dettaglio di una card",
+        "description": "Accesso: membro. Restituisce l'header ETag con la versione. Non usata dall'interfaccia (la versione arriva con la lista).",
+        "responses": {
+          "200": {
+            "description": "Card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "versione della card, es. \"4\""
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Modifica il contenuto",
+        "description": "Accesso: membro; dueDate solo owner. Optimistic locking: aggiorna solo se la versione indicata in If-Match è ancora quella attuale (findOneAndUpdate con __v nel filtro e $inc). Evento SSE card.updated.",
+        "responses": {
+          "200": {
+            "description": "Card aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "versione della card, es. \"4\""
+              }
+            }
+          },
+          "400": {
+            "description": "Dati non validi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Un member ha provato a cambiare la scadenza",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "La card è stata modificata da un altro utente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Header If-Match obbligatorio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "\"3\""
+            },
+            "description": "versione su cui si basa la modifica (valore di __v tra virgolette)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  }
+                }
+              },
+              "example": {
+                "title": "Login con JWT",
+                "description": "Testo aggiornato"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Elimina una card",
+        "description": "Accesso: owner. Evento SSE card.deleted.",
+        "responses": {
+          "204": {
+            "description": "Eliminata"
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo il proprietario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cards/{cardId}/status": {
+      "patch": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Sposta la card di colonna",
+        "description": "Accesso: membro. La card va in fondo alla nuova colonna; se lo stato è lo stesso non scrive nulla. Evento SSE card.updated.",
+        "responses": {
+          "200": {
+            "description": "Card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Stato inesistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "backlog",
+                      "todo",
+                      "doing",
+                      "done"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "example": {
+                "status": "doing"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cards/{cardId}/assignee": {
+      "patch": {
+        "tags": [
+          "Card"
+        ],
+        "summary": "Assegna la card",
+        "description": "Accesso: membro. Owner: a chiunque della board o null. Member: solo a se stesso. Evento SSE card.updated.",
+        "responses": {
+          "200": {
+            "description": "Card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "L'utente non è membro della board",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Un member può assegnare la card solo a se stesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cards/{cardId}/subtasks": {
+      "post": {
+        "tags": [
+          "Sottotask"
+        ],
+        "summary": "Aggiunge un sottotask",
+        "description": "Accesso: membro. $push nell'array, atomico. Evento SSE card.updated.",
+        "responses": {
+          "201": {
+            "description": "Card con il nuovo sottotask",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Titolo mancante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              },
+              "example": {
+                "title": "Scrivere i test"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cards/{cardId}/subtasks/{subId}": {
+      "patch": {
+        "tags": [
+          "Sottotask"
+        ],
+        "summary": "Spunta o toglie la spunta",
+        "description": "Accesso: membro. $set con l'operatore posizionale subtasks.$.done. Evento SSE card.updated.",
+        "responses": {
+          "200": {
+            "description": "Card aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Il campo done (true/false) è obbligatorio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sottotask o card non trovati",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          },
+          {
+            "name": "subId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id del sottotask"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "done": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "done"
+                ]
+              },
+              "example": {
+                "done": true
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Sottotask"
+        ],
+        "summary": "Elimina un sottotask",
+        "description": "Accesso: membro. Update con $pull (la card resta). Evento SSE card.updated.",
+        "responses": {
+          "200": {
+            "description": "Card aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Card"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa inesistente o board di cui non si è membri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id della card"
+          },
+          {
+            "name": "subId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "id del sottotask"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  }
+}
